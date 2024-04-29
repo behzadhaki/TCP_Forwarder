@@ -7,12 +7,13 @@ void PluginWithCustomModuleAudioProcessor::processBlock(juce::AudioBuffer<float>
         buffer.clear();
 }
 
-#include "PluginProcessor.h"
-#include "PluginEditor.h"
+
+using namespace std;
 
 PluginWithCustomModuleAudioProcessor::PluginWithCustomModuleAudioProcessor()
 {
     // Default constructor
+    startServer();
 }
 
 juce::AudioProcessorEditor *PluginWithCustomModuleAudioProcessor::createEditor() {
@@ -39,12 +40,12 @@ const juce::String PluginWithCustomModuleAudioProcessor::getName() const
 
 bool PluginWithCustomModuleAudioProcessor::startListening(int port)
 {
-    return sourceSocket.createListener(port);
+    return sourceSocket.bindToPort(port);
 }
 
-bool PluginWithCustomModuleAudioProcessor::connectToHost(const juce::String& host, int port)
+bool PluginWithCustomModuleAudioProcessor::connectToHost(int port)
 {
-    return destinationSocket.connect(host, port);
+    return destinationSocket.bindToPort(port);
 }
 void PluginWithCustomModuleAudioProcessor::startServer()
 {
@@ -53,15 +54,16 @@ void PluginWithCustomModuleAudioProcessor::startServer()
     {
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                "Error",
-                                               "Failed to listen on incoming port!",
+                                               "Failed to listen on incoming port " + juce::String(incomingPort),
                                                "OK");
-        return;
     }
 
-    if (!connectToHost("localhost", outgoingPort))
+    if (!connectToHost(outgoingPort))
     {
-        juce::Logger::writeToLog("Failed to connect to destination port!");
-        return;
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Error",
+                                               "Failed to connect to outgoing port " + juce::String(outgoingPort),
+                                               "OK");
     }
 
     startTimer(timerDelayMS);
@@ -79,7 +81,8 @@ void PluginWithCustomModuleAudioProcessor::timerCallback()
 
         if (bytesRead > 0)
         {
-            destinationSocket.write(buffer, bytesRead);
+            cout << "Received " << bytesRead << " bytes from source" << endl;
+//            destinationSocket.write(buffer, bytesRead);
         }
     }
 }

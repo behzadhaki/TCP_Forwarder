@@ -1,0 +1,16 @@
+#N canvas 399 781 661 708 12;
+#X msg 234 304 disconnect;
+#X floatatom 226 419 0 0 0 0 - - - 0;
+#X obj 226 392 netsend -u;
+#X floatatom 243 334 0 0 0 0 - - - 0;
+#X obj 293 419 print backward;
+#X text 301 186 UDP \, FUDI;
+#X msg 371 257 timeout 3000;
+#X msg 226 207 connect localhost 8000;
+#X msg 243 361 send \$1;
+#X connect 0 0 2 0;
+#X connect 2 0 1 0;
+#X connect 2 1 4 0;
+#X connect 3 0 8 0;
+#X connect 7 0 2 0;
+#X connect 8 0 2 0;

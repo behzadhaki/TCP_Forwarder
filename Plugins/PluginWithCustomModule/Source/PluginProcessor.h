@@ -14,14 +14,14 @@ public:
     const juce::String getName() const override;
 
     bool startListening(int port);
-    bool connectToHost(const juce::String& host, int port);
+    bool connectToHost(int port);
     void startServer();
     void timerCallback() override;
     juce::AudioProcessorEditor *createEditor() override;
-private:
     int incomingPort{8000};
-    int outgoingPort{8001};
+    int outgoingPort{8050};
     int timerDelayMS{100};
+private:
 
     juce::StreamingSocket sourceSocket, destinationSocket;
 
