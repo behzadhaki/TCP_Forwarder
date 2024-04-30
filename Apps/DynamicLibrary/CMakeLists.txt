@@ -1,7 +1,8 @@
 project(AppWithDLL VERSION 0.1)
 
 #first, we define the dll:
-add_library(DLL SHARED Source/DLL.cpp)
+add_library(DLL SHARED Source/DLL.cpp
+        ../../Plugins/PluginWithCustomModule/Source/background_thread.h)
 target_compile_definitions(DLL PRIVATE JUCE_STANDALONE_APPLICATION=1)
 _juce_initialise_target(DLL)
 

@@ -16,9 +16,9 @@ PluginWithCustomModuleAudioProcessorEditor::PluginWithCustomModuleAudioProcessor
     outgoingPortInput.setJustification(juce::Justification::centred);
     delayInput.setJustification(juce::Justification::centred);
 
-    incomingPortInput.setText(juce::String(processor.incomingPort), juce::dontSendNotification);
-    outgoingPortInput.setText(juce::String(processor.outgoingPort), juce::dontSendNotification);
-    delayInput.setText(juce::String(processor.timerDelayMS), juce::dontSendNotification);
+    incomingPortInput.setText(juce::String(processor.backgroundTask.incomingPort), juce::dontSendNotification);
+    outgoingPortInput.setText(juce::String(processor.backgroundTask.outgoingPort), juce::dontSendNotification);
+    delayInput.setText(juce::String(processor.backgroundTask.timerDelayMS), juce::dontSendNotification);
 
 }
 
