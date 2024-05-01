@@ -12,6 +12,8 @@ using namespace std;
 
 PluginWithCustomModuleAudioProcessor::PluginWithCustomModuleAudioProcessor()
 {
+    Bg2GuiQueuePtr = make_unique<StaticLockFreeQueue<array<double, 9>, 128>>();
+    backgroundTask.Bg2GuiQueuePtr = Bg2GuiQueuePtr.get();
     backgroundTask.startTask();
 }
 

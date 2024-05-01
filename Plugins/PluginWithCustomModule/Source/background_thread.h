@@ -7,6 +7,9 @@
 
 #include <shared_processing_code/shared_processing_code.h>
 #include <shared_plugin_helpers/shared_plugin_helpers.h>
+#include "LockFreeQueue.h"
+
+using namespace std;
 
 class BackgroundTask : public juce::Thread
 {
@@ -15,14 +18,17 @@ private:
     juce::StreamingSocket* listenerSocket{nullptr};
 
 public:
-    int incomingPort{8000};
-    int outgoingPort{8050};
-    int timerDelayMS{100};
+    StaticLockFreeQueue<array<double, 9>, 128>* Bg2GuiQueuePtr{};
 
+    int incomingPort{8000};
+    int outgoingPortDecoded {8050};
+    int timerDelayMS{1};
+
+    char buffer[4 * 1024] = {0}; // Initialize buffer to zero
 
 
     BackgroundTask() : juce::Thread("Background Task Thread") {
-        startServer();
+//        startServer();
     }
 
     ~BackgroundTask()
@@ -40,6 +46,7 @@ public:
             if (listenerSocket->isConnected())
             {
                 listenerSocket->close();
+                listenerSocket = nullptr;
             }
         }
 
@@ -48,11 +55,7 @@ public:
             sourceSocket.close();
         }
 
-        if (sourceSocket.createListener(port))
-        {
-            listenerSocket = sourceSocket.waitForNextConnection();
-            return listenerSocket->isConnected();
-        }
+        return sourceSocket.createListener(port);
 
         return false;
     }
@@ -66,6 +69,14 @@ public:
         return destinationSocket.connect("localhost", port);
     }
 
+    bool connectButtonClicked(array<int, 3> values) {
+        incomingPort = values[0];
+        outgoingPortDecoded = values[1];
+        timerDelayMS = values[2];
+
+        return startServer();
+    }
+
     bool startServer()
     {
         if (!startListening(incomingPort))
@@ -77,11 +88,11 @@ public:
             return false;
         }
 
-        if (!connectToHost(outgoingPort))
+        if (!connectToHost(outgoingPortDecoded))
         {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                    "Error",
-                                                   "Failed to connect to outgoing port " + juce::String(outgoingPort),
+                                                   "Failed to connect to outgoing port " + juce::String(outgoingPortDecoded),
                                                    "OK");
             return false;
         }
@@ -91,24 +102,22 @@ public:
 
     void run() override
     {
-        using namespace std;
 
         while (! threadShouldExit())
         {
-            // Your thread code here. This block is executed repeatedly until the thread is told to exit.
-            cout << "Thread running..." << endl;
+            if (listenerSocket == nullptr && sourceSocket.isConnected()) {
+                listenerSocket = sourceSocket.waitForNextConnection();
+            }
 
-            // Example of a task: simulate some work
             performTask();
 
             // Sleep to yield some time to other processes
-            wait(100); // Wait for 100 milliseconds
+            wait(1); // Wait for 1 milliseconds
         }
     }
 
     void performTask()
     {
-        using namespace std;
 
         // Example task implementation
         static const juce::Colour green = juce::Colours::green;
@@ -116,12 +125,21 @@ public:
 
         if (sourceSocket.isConnected())
         {
-            char buffer[1024] = {0}; // Initialize buffer to zero
             const int bytesRead = listenerSocket->read(buffer, sizeof(buffer), false);
 
             if (bytesRead > 0)
             {
-                cout << "Received " << bytesRead << " bytes from source." << endl;
+                cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
+
+                auto decodedVals = decodeBuffer(buffer);
+                if (!decodedVals.empty()) {
+                    cout << "Decoded values: ";
+                    for (auto val : decodedVals) {
+                        cout << val << " ";
+                    }
+                    cout << endl;
+                }
+
                 int bytesWritten = destinationSocket.write(buffer, bytesRead);
                 if (bytesWritten < 0)
                 {
@@ -132,8 +150,53 @@ public:
         }
         else
         {
-            cout << "Source socket not connected." << endl;
         }
+    }
+
+    std::array<double, 9> decodeBuffer(const std::string& input)  {
+        std::array<double, 9> reqVals;
+
+        if (input.find("DEBUG") == 0) {
+            return reqVals; // Ignore debug messages
+        }
+
+        if (input[0] == 'D') {
+            auto parts = split(input.substr(4), '-'); // Skip 'D01.' and split the rest
+            cout << "Parts size: " << parts.size() << endl;
+
+            if (!parts.empty()) { // Check if the number of data segments is correct
+                reqVals = {
+                    scaleEEG(hex2dec(parts[1]) * 256 + hex2dec(parts[2])),  // EEG right
+                    scaleEEG(hex2dec(parts[3]) * 256 + hex2dec(parts[4])),  // EEG left
+                    scaleAccel(hex2dec(parts[5]) * 256 + hex2dec(parts[6])),  // Accelerometer dx
+                    scaleAccel(hex2dec(parts[7]) * 256 + hex2dec(parts[8])),  // Accelerometer dy
+                    scaleAccel(hex2dec(parts[9]) * 256 + hex2dec(parts[10])), // Accelerometer dz
+                    bodyTemp(hex2dec(parts[25]) * 256 + hex2dec(parts[26])),  // Body temperature
+                    batteryVoltage(hex2dec(parts[21]) * 256 + hex2dec(parts[22])),  // Battery voltage
+                    static_cast<double>(hex2dec(parts[19])),  // Noise (assuming raw value is needed)
+                    static_cast<double>(hex2dec(parts[20]))   // Light (assuming raw value is needed)
+                };
+
+                if (Bg2GuiQueuePtr != nullptr) {
+                    Bg2GuiQueuePtr->push(reqVals);
+                }
+
+            }
+        }
+
+        // convert to a string formatted as "eegl
+
+        return reqVals;
+    }
+
+    static std::vector<std::string> split(const std::string& str, char delimiter) {
+        std::vector<std::string> tokens;
+        std::stringstream ss(str);
+        std::string token;
+        while (std::getline(ss, token, delimiter)) {
+            tokens.push_back(token);
+        }
+        return tokens;
     }
 
     void startTask()
@@ -160,6 +223,40 @@ public:
                 stopThread(0); // Force thread to stop immediately
             }
         }
+    }
+
+    static int getByteAt(const std::string& buf, int idx) {
+        std::string byteStr = buf.substr(idx * 3, 2);
+        return std::stoi(byteStr, nullptr, 16);
+    }
+
+    static int getWordAt(const std::string& buf, int idx) {
+        int high = getByteAt(buf, idx);
+        int low = getByteAt(buf, idx + 1);
+        return high * 256 + low;
+    }
+
+    static double scaleEEG(int value) {
+        double uvRange = 3952;
+        double d = value - 32768;
+        return d * uvRange / 65536;
+    }
+
+    static double scaleAccel(int value) {
+        return value * 4.0 / 4096.0 - 2.0;
+    }
+
+    static double batteryVoltage(int value) {
+        return value / 1024.0 * 6.60;
+    }
+
+    static double bodyTemp(int value) {
+        double v = value / 1024.0 * 3.3;
+        return 15.0 + ((v - 1.0446) / 0.0565537333333333);
+    }
+
+    int hex2dec(const std::string& hexStr) {
+        return std::stoi(hexStr, nullptr, 16);
     }
 };
 
