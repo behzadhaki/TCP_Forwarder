@@ -28,7 +28,7 @@ public:
 
 
     BackgroundTask() : juce::Thread("Background Task Thread") {
-//        startServer();
+        startServer();
     }
 
     ~BackgroundTask()
@@ -129,16 +129,16 @@ public:
 
             if (bytesRead > 0)
             {
-                cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
+                // cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
 
                 auto decodedVals = decodeBuffer(buffer);
-                if (!decodedVals.empty()) {
+                /*if (!decodedVals.empty()) {
                     cout << "Decoded values: ";
                     for (auto val : decodedVals) {
                         cout << val << " ";
                     }
                     cout << endl;
-                }
+                }*/
 
                 int bytesWritten = destinationSocket.write(buffer, bytesRead);
                 if (bytesWritten < 0)
@@ -162,7 +162,7 @@ public:
 
         if (input[0] == 'D') {
             auto parts = split(input.substr(4), '-'); // Skip 'D01.' and split the rest
-            cout << "Parts size: " << parts.size() << endl;
+            // cout << "Parts size: " << parts.size() << endl;
 
             if (!parts.empty()) { // Check if the number of data segments is correct
                 reqVals = {
