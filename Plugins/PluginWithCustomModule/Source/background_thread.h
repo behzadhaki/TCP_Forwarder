@@ -129,21 +129,28 @@ public:
 
             if (bytesRead > 0)
             {
-                // cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
+                cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
 
                 auto decodedVals = decodeBuffer(buffer);
-                /*if (!decodedVals.empty()) {
-                    cout << "Decoded values: ";
-                    for (auto val : decodedVals) {
-                        cout << val << " ";
-                    }
-                    cout << endl;
-                }*/
 
-                int bytesWritten = destinationSocket.write(buffer, bytesRead);
+                // parse the decoded values and send them to the destination socket Format: "eegLeft, eegRight, accX, accY, accZ, bodyTemp, battVolt, noise, light"
+                std::string formattedVals = std::to_string(decodedVals[0]) + " " +             // EEG left
+                                            std::to_string(decodedVals[1]) + " " +                   // EEG right
+                                            std::to_string(decodedVals[2]) + " " +                  // Accelerometer dx
+                                            std::to_string(decodedVals[3]) + " " +                 // Accelerometer dy
+                                            std::to_string(decodedVals[4]) + " " +               // Accelerometer dz
+                                            std::to_string(decodedVals[5]) + " " +             // Body temperature
+                                            std::to_string(decodedVals[6]) + " " +           // Battery voltage
+                                            std::to_string(decodedVals[7]) + " " +         // Noise
+                                            std::to_string(decodedVals[8]) +";";                // Light
+
+                auto msg = formattedVals.c_str();
+                int bytesWritten = destinationSocket.write(msg,  (strlen(msg)));
                 if (bytesWritten < 0)
                 {
                     cout << "Error writing to destination socket." << endl;
+                } else {
+                     cout << "Sent " << bytesWritten << " bytes to destination: " << msg << endl;
                 }
             }
 
