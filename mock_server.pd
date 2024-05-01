@@ -1,7 +1,7 @@
-#N canvas -9 835 1079 957 12;
+#N canvas -1067 -988 1079 957 12;
 #X msg 234 304 disconnect;
-#X floatatom 226 419 2 0 0 0 - - - 0;
-#X floatatom 243 334 0 0 0 0 - - - 0;
+#X floatatom 226 419 2 0 0 0 - - -, f 2;
+#X floatatom 243 334 0 0 0 0 - - -;
 #X obj 293 419 print backward;
 #X text 301 186 UDP \, FUDI;
 #X msg 226 207 connect localhost 8000;
