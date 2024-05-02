@@ -15,7 +15,6 @@ class BackgroundTask : public juce::Thread
 {
 private:
     juce::StreamingSocket sourceSocket{}, destinationSocket{};
-    juce::StreamingSocket* listenerSocket{nullptr};
 
 public:
     StaticLockFreeQueue<array<double, 9>, 128>* Bg2GuiQueuePtr{};
@@ -28,7 +27,7 @@ public:
 
 
     BackgroundTask() : juce::Thread("Background Task Thread") {
-        startServer();
+
     }
 
     ~BackgroundTask()
@@ -41,23 +40,14 @@ public:
     }
 
     bool startListening(int port) {
-        if (listenerSocket!=nullptr)
-        {
-            if (listenerSocket->isConnected())
-            {
-                listenerSocket->close();
-                listenerSocket = nullptr;
-            }
-        }
 
         if (sourceSocket.isConnected())
         {
             sourceSocket.close();
         }
 
-        return sourceSocket.createListener(port);
+        return  sourceSocket.connect("localhost", port);
 
-        return false;
     }
 
     bool connectToHost(int port) {
@@ -79,20 +69,20 @@ public:
 
     bool startServer()
     {
-        if (!startListening(incomingPort))
-        {
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                   "Error",
-                                                   "Failed to listen on incoming port " + juce::String(incomingPort),
-                                                   "OK");
-            return false;
-        }
-
         if (!connectToHost(outgoingPortDecoded))
         {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                    "Error",
                                                    "Failed to connect to outgoing port " + juce::String(outgoingPortDecoded),
+                                                   "OK");
+            return false;
+        }
+
+        if (!startListening(incomingPort))
+        {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Error",
+                                                   "Failed to listen on incoming port " + juce::String(incomingPort),
                                                    "OK");
             return false;
         }
@@ -105,9 +95,6 @@ public:
 
         while (! threadShouldExit())
         {
-            if (listenerSocket == nullptr && sourceSocket.isConnected()) {
-                listenerSocket = sourceSocket.waitForNextConnection();
-            }
 
             performTask();
 
@@ -125,33 +112,11 @@ public:
 
         if (sourceSocket.isConnected())
         {
-            const int bytesRead = listenerSocket->read(buffer, sizeof(buffer), false);
+            const int bytesRead = sourceSocket.read(buffer, sizeof(buffer), false);
 
             if (bytesRead > 0)
             {
-                cout << "Received " << bytesRead << " bytes from source: " << buffer << endl;
-
-                auto decodedVals = decodeBuffer(buffer);
-
-                // parse the decoded values and send them to the destination socket Format: "eegLeft, eegRight, accX, accY, accZ, bodyTemp, battVolt, noise, light"
-                std::string formattedVals = std::to_string(decodedVals[0]) + " " +             // EEG left
-                                            std::to_string(decodedVals[1]) + " " +                   // EEG right
-                                            std::to_string(decodedVals[2]) + " " +                  // Accelerometer dx
-                                            std::to_string(decodedVals[3]) + " " +                 // Accelerometer dy
-                                            std::to_string(decodedVals[4]) + " " +               // Accelerometer dz
-                                            std::to_string(decodedVals[5]) + " " +             // Body temperature
-                                            std::to_string(decodedVals[6]) + " " +           // Battery voltage
-                                            std::to_string(decodedVals[7]) + " " +         // Noise
-                                            std::to_string(decodedVals[8]) +";";                // Light
-
-                auto msg = formattedVals.c_str();
-                int bytesWritten = destinationSocket.write(msg,  (strlen(msg)));
-                if (bytesWritten < 0)
-                {
-                    cout << "Error writing to destination socket." << endl;
-                } else {
-                     cout << "Sent " << bytesWritten << " bytes to destination: " << msg << endl;
-                }
+                decodeAndSendBuffer(buffer);
             }
 
         }
@@ -160,14 +125,17 @@ public:
         }
     }
 
-    std::array<double, 9> decodeBuffer(const std::string& input)  {
-        std::array<double, 9> reqVals;
+    std::array<double, 9> decodeAndSendBuffer(const std::string& input)  {
+        std::array<double, 9> reqVals{};
 
         if (input.find("DEBUG") == 0) {
+            // cout << input << endl;
             return reqVals; // Ignore debug messages
         }
 
         if (input[0] == 'D') {
+            // cout << "Received data: " << input << endl;
+
             auto parts = split(input.substr(4), '-'); // Skip 'D01.' and split the rest
             // cout << "Parts size: " << parts.size() << endl;
 
@@ -183,6 +151,27 @@ public:
                     static_cast<double>(hex2dec(parts[19])),  // Noise (assuming raw value is needed)
                     static_cast<double>(hex2dec(parts[20]))   // Light (assuming raw value is needed)
                 };
+
+                // parse the decoded values and send them to the destination socket Format: "eegLeft, eegRight, accX, accY, accZ, bodyTemp, battVolt, noise, light"
+                std::string formattedVals = std::to_string(reqVals[0]) + " " +             // EEG left
+                                            std::to_string(reqVals[1]) + " " +                   // EEG right
+                                            std::to_string(reqVals[2]) + " " +                  // Accelerometer dx
+                                            std::to_string(reqVals[3]) + " " +                 // Accelerometer dy
+                                            std::to_string(reqVals[4]) + " " +               // Accelerometer dz
+                                            std::to_string(reqVals[5]) + " " +             // Body temperature
+                                            std::to_string(reqVals[6]) + " " +           // Battery voltage
+                                            std::to_string(reqVals[7]) + " " +         // Noise
+                                            std::to_string(reqVals[8]) +";";                // Light
+
+                auto msg = formattedVals.c_str();
+                int bytesWritten = destinationSocket.write(msg,  (strlen(msg)));
+                if (bytesWritten < 0)
+                {
+                    cout << "Error writing to destination socket." << endl;
+                } else {
+                    // cout << "Sent " << bytesWritten << " bytes to destination: " << msg << endl;
+                }
+
 
                 if (Bg2GuiQueuePtr != nullptr) {
                     Bg2GuiQueuePtr->push(reqVals);
@@ -220,6 +209,16 @@ public:
 
     void stopTask()
     {
+        if (sourceSocket.isConnected())
+        {
+            sourceSocket.close();
+        }
+
+        if (destinationSocket.isConnected())
+        {
+            destinationSocket.close();
+        }
+
         if (isThreadRunning())
         {
             signalThreadShouldExit(); // Tell the thread to stop
