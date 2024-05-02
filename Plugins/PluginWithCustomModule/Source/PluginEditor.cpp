@@ -7,7 +7,7 @@ PluginWithCustomModuleAudioProcessorEditor::PluginWithCustomModuleAudioProcessor
 {
     Bg2GuiQueuePtr = processor.Bg2GuiQueuePtr.get();
 
-    setSize(500, 300);
+    setSize(500, 400);
 
     // Adding text editors and connect button
     addAndMakeVisible(incomingPortInput);

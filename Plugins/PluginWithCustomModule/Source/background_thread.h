@@ -23,7 +23,7 @@ public:
     int outgoingPortDecoded {8050};
     int timerDelayMS{1};
 
-    char buffer[4 * 1024] = {0}; // Initialize buffer to zero
+
 
 
     BackgroundTask() : juce::Thread("Background Task Thread") {
@@ -46,8 +46,25 @@ public:
             sourceSocket.close();
         }
 
-        return  sourceSocket.connect("localhost", port);
+        auto is_connected = sourceSocket.connect("localhost", port);
 
+        if (is_connected) {
+            sourceSocket.waitUntilReady(false, -1);
+
+            std::string formattedVals = "HELLO\n";
+
+            auto msg = formattedVals.c_str();
+            int bytesWritten = sourceSocket.write(msg,  (strlen(msg)));
+
+            if (bytesWritten < 0)
+            {
+//                cout << "Error writing to source socket." << endl;
+            } else {
+//                cout << "Sent " << bytesWritten << " bytes to source: " << msg << endl;
+            }
+        }
+
+        return is_connected;
     }
 
     bool connectToHost(int port) {
@@ -112,11 +129,18 @@ public:
 
         if (sourceSocket.isConnected())
         {
+            char buffer[4 * 1024] = {0}; // Initialize buffer to zero
+
             const int bytesRead = sourceSocket.read(buffer, sizeof(buffer), false);
 
             if (bytesRead > 0)
             {
+//                cout << "___ Received " << bytesRead << " bytes from source: " << buffer << endl;
                 decodeAndSendBuffer(buffer);
+            } else if (bytesRead == 0) {
+//                cout << "___ 0 Bytes Read " << buffer <<endl;
+            } else {
+//                cout << "___ Error reading from source socket." << endl;
             }
 
         }
@@ -167,7 +191,7 @@ public:
                 int bytesWritten = destinationSocket.write(msg,  (strlen(msg)));
                 if (bytesWritten < 0)
                 {
-                    cout << "Error writing to destination socket." << endl;
+//                    cout << "Error writing to destination socket." << endl;
                 } else {
                     // cout << "Sent " << bytesWritten << " bytes to destination: " << msg << endl;
                 }
