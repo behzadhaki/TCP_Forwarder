@@ -22,12 +22,13 @@ public:
     int incomingPort{8000};
     int outgoingPortDecoded {8050};
     int timerDelayMS{1};
-
+    char buffer[4 * 1024] = {0}; // Initialize buffer to zero
+    chrono::time_point<chrono::system_clock> prevMsg = std::chrono::system_clock::now();
 
 
 
     BackgroundTask() : juce::Thread("Background Task Thread") {
-
+        setPriority(juce::Thread::Priority::highest);
     }
 
     ~BackgroundTask()
@@ -113,10 +114,13 @@ public:
         while (! threadShouldExit())
         {
 
+            // Record start time
+
+
             performTask();
 
-            // Sleep to yield some time to other processes
-            wait(1); // Wait for 1 milliseconds
+
+
         }
     }
 
@@ -129,14 +133,25 @@ public:
 
         if (sourceSocket.isConnected())
         {
-            char buffer[4 * 1024] = {0}; // Initialize buffer to zero
+            buffer[0] = '\0'; // Clear buffer
 
             const int bytesRead = sourceSocket.read(buffer, sizeof(buffer), false);
 
             if (bytesRead > 0)
             {
+                // Record end time
+                auto endTime = std::chrono::system_clock::now();
+
+                // Calculate time difference
+                auto timeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - prevMsg).count();
+
+                // Log the time difference
+                std::cout << "Time difference between iterations: " << timeDifference << " ms" << std::endl;
 //                cout << "___ Received " << bytesRead << " bytes from source: " << buffer << endl;
                 decodeAndSendBuffer(buffer);
+
+                prevMsg = std::chrono::system_clock::now();
+
             } else if (bytesRead == 0) {
 //                cout << "___ 0 Bytes Read " << buffer <<endl;
             } else {
