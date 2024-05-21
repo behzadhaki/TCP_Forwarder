@@ -14,16 +14,16 @@ using namespace std;
 class BackgroundTask : public juce::Thread
 {
 private:
-    juce::StreamingSocket sourceSocket{}, destinationSocket{};
+    juce::StreamingSocket zMaxSocket {}, pdSocket {};
 
 public:
     StaticLockFreeQueue<array<double, 9>, 128>* Bg2GuiQueuePtr{};
 
-    int incomingPort{8000};
-    int outgoingPortDecoded {8050};
-    int timerDelayMS{1};
-    char buffer[4 * 1024] = {0}; // Initialize buffer to zero
-    chrono::time_point<chrono::system_clock> prevMsg = std::chrono::system_clock::now();
+    int zMaxPort {8000};
+    int pdPort {8050};
+    int shouldPrintRcvdMsgs {0};
+    char buffer[1024] = {0}; // Initialize buffer to zero
+    chrono::time_point<chrono::system_clock> prevMsgTimeStamp = std::chrono::system_clock::now();
 
 
 
@@ -36,26 +36,26 @@ public:
         // Ensure the thread is stopped properly
         stopThread(4000); // Wait up to 4 seconds for the thread to finish
 
-        sourceSocket.close();
-        destinationSocket.close();
+        zMaxSocket.close();
+        pdSocket.close();
     }
 
     bool startListening(int port) {
 
-        if (sourceSocket.isConnected())
+        if (zMaxSocket.isConnected())
         {
-            sourceSocket.close();
+            zMaxSocket.close();
         }
 
-        auto is_connected = sourceSocket.connect("localhost", port);
+        auto is_connected = zMaxSocket.connect("localhost", port);
 
         if (is_connected) {
-            sourceSocket.waitUntilReady(false, -1);
+            zMaxSocket.waitUntilReady(false, -1);
 
             std::string formattedVals = "HELLO\n";
 
             auto msg = formattedVals.c_str();
-            int bytesWritten = sourceSocket.write(msg,  (strlen(msg)));
+            int bytesWritten = zMaxSocket.write(msg,  (strlen(msg)));
 
             if (bytesWritten < 0)
             {
@@ -69,38 +69,38 @@ public:
     }
 
     bool connectToHost(int port) {
-        if (destinationSocket.isConnected())
+        if (pdSocket.isConnected())
         {
-            destinationSocket.close();
+            pdSocket.close();
         }
 
-        return destinationSocket.connect("localhost", port);
+        return pdSocket.connect("localhost", port);
     }
 
     bool connectButtonClicked(array<int, 3> values) {
-        incomingPort = values[0];
-        outgoingPortDecoded = values[1];
-        timerDelayMS = values[2];
+        zMaxPort = values[0];
+        pdPort = values[1];
+        shouldPrintRcvdMsgs = values[2];
 
         return startServer();
     }
 
     bool startServer()
     {
-        if (!connectToHost(outgoingPortDecoded))
+        if (!connectToHost(pdPort))
         {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                    "Error",
-                                                   "Failed to connect to outgoing port " + juce::String(outgoingPortDecoded),
+                                                   "Failed to connect to outgoing port " + juce::String(pdPort),
                                                    "OK");
             return false;
         }
 
-        if (!startListening(incomingPort))
+        if (!startListening(zMaxPort))
         {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                    "Error",
-                                                   "Failed to listen on incoming port " + juce::String(incomingPort),
+                                                   "Failed to listen on incoming port " + juce::String(zMaxPort),
                                                    "OK");
             return false;
         }
@@ -131,11 +131,11 @@ public:
         static const juce::Colour green = juce::Colours::green;
         static const juce::Colour red = juce::Colours::red;
 
-        if (sourceSocket.isConnected())
+        if (zMaxSocket.isConnected())
         {
             buffer[0] = '\0'; // Clear buffer
 
-            const int bytesRead = sourceSocket.read(buffer, sizeof(buffer), false);
+            const int bytesRead = zMaxSocket.read(buffer, sizeof(buffer), false);
 
             if (bytesRead > 0)
             {
@@ -143,14 +143,14 @@ public:
                 auto endTime = std::chrono::system_clock::now();
 
                 // Calculate time difference
-                auto timeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - prevMsg).count();
+                auto timeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - prevMsgTimeStamp).count();
 
                 // Log the time difference
                 std::cout << "Time difference between iterations: " << timeDifference << " ms" << std::endl;
 //                cout << "___ Received " << bytesRead << " bytes from source: " << buffer << endl;
                 decodeAndSendBuffer(buffer);
 
-                prevMsg = std::chrono::system_clock::now();
+                prevMsgTimeStamp = std::chrono::system_clock::now();
 
             } else if (bytesRead == 0) {
 //                cout << "___ 0 Bytes Read " << buffer <<endl;
@@ -165,6 +165,8 @@ public:
     }
 
     std::array<double, 9> decodeAndSendBuffer(const std::string& input)  {
+        return {};
+
         std::array<double, 9> reqVals{};
 
         if (input.find("DEBUG") == 0) {
@@ -203,7 +205,7 @@ public:
                                             std::to_string(reqVals[8]) +";";                // Light
 
                 auto msg = formattedVals.c_str();
-                int bytesWritten = destinationSocket.write(msg,  (strlen(msg)));
+                int bytesWritten = pdSocket.write(msg,  (strlen(msg)));
                 if (bytesWritten < 0)
                 {
 //                    cout << "Error writing to destination socket." << endl;
@@ -248,14 +250,14 @@ public:
 
     void stopTask()
     {
-        if (sourceSocket.isConnected())
+        if (zMaxSocket.isConnected())
         {
-            sourceSocket.close();
+            zMaxSocket.close();
         }
 
-        if (destinationSocket.isConnected())
+        if (pdSocket.isConnected())
         {
-            destinationSocket.close();
+            pdSocket.close();
         }
 
         if (isThreadRunning())

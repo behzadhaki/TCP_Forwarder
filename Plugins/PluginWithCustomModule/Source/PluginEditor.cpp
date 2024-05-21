@@ -12,26 +12,26 @@ PluginWithCustomModuleAudioProcessorEditor::PluginWithCustomModuleAudioProcessor
     // Adding text editors and connect button
     addAndMakeVisible(incomingPortInput);
     addAndMakeVisible(outgoingPortInput);
-    addAndMakeVisible(delayInput);
+    addAndMakeVisible(shouldPrintRcvdMsgs);
     addAndMakeVisible(connectButton);
 
     // Setting text editors' justification
     incomingPortInput.setJustification(juce::Justification::centred);
-    incomingPortInput.setText(juce::String(processor.backgroundTask.incomingPort));
+    incomingPortInput.setText(juce::String(processor.backgroundTask.zMaxPort));
     outgoingPortInput.setJustification(juce::Justification::centred);
-    outgoingPortInput.setText(juce::String(processor.backgroundTask.outgoingPortDecoded));
-    delayInput.setJustification(juce::Justification::centred);
-    delayInput.setText(juce::String(processor.backgroundTask.timerDelayMS));
+    outgoingPortInput.setText(juce::String(processor.backgroundTask.pdPort));
+    shouldPrintRcvdMsgs.setJustification(juce::Justification::centred);
+    shouldPrintRcvdMsgs.setText(juce::String(processor.backgroundTask.shouldPrintRcvdMsgs));
 
     // Adding labels
     addAndMakeVisible(incomingPortLabel);
     addAndMakeVisible(outgoingPortLabel);
-    addAndMakeVisible(delayLabel);
+    addAndMakeVisible(shouldPrintLabel);
 
     // Setting labels' text
     incomingPortLabel.setText("Server Port -> ", juce::dontSendNotification);
     outgoingPortLabel.setText("    Pd Port -> ", juce::dontSendNotification);
-    delayLabel.setText(       "   Delay ms -> ", juce::dontSendNotification);
+    shouldPrintLabel.setText(       "Print (set > 0)", juce::dontSendNotification);
 
     // Ineditable text boxes
     initializeReadOnlyLabel(eegLeft, "EEG Left");
@@ -82,8 +82,8 @@ void PluginWithCustomModuleAudioProcessorEditor::layoutComponents()
     incomingPortInput.setBounds(connect_area.removeFromLeft(connect_width));
     outgoingPortLabel.setBounds(connect_area.removeFromLeft(connect_width));
     outgoingPortInput.setBounds(connect_area.removeFromLeft(connect_width));
-    delayLabel.setBounds(connect_area.removeFromLeft(connect_width));
-    delayInput.setBounds(connect_area);
+    shouldPrintLabel.setBounds(connect_area.removeFromLeft(connect_width));
+    shouldPrintRcvdMsgs.setBounds(connect_area);
 
     area.removeFromTop(24);
 
@@ -149,7 +149,7 @@ void PluginWithCustomModuleAudioProcessorEditor::connectButtonClicked()
     array<int, 3> values;
     values[0] = incomingPortInput.getText().getIntValue();
     values[1] = outgoingPortInput.getText().getIntValue();
-    values[2] = delayInput.getText().getIntValue();
+    values[2] = shouldPrintRcvdMsgs.getText().getIntValue();
 
     processor.backgroundTask.connectButtonClicked(values);
 }

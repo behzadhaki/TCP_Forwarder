@@ -16,8 +16,8 @@ public:
 
 private:
     PluginWithCustomModuleAudioProcessor& processor;
-    juce::TextEditor incomingPortInput, outgoingPortInput, delayInput;
-    juce::Label incomingPortLabel, outgoingPortLabel, delayLabel;
+    juce::TextEditor incomingPortInput, outgoingPortInput, shouldPrintRcvdMsgs;
+    juce::Label incomingPortLabel, outgoingPortLabel, shouldPrintLabel;
     juce::TextButton connectButton;
     juce::Label eegLeft, eegRight, accX, accY, accZ, bodyTemp, battVolt, noise, light;
     juce::Label eegLeftVal, eegRightVal, accXVal, accYVal, accZVal, bodyTempVal, battVoltVal, noiseVal, lightVal;
